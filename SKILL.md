@@ -60,16 +60,29 @@ Phase D ─ 配置定时任务与通知（子 Agent: cron-scheduler）
 
 ❌ 未检测到 ALIYUN CLI，需要先安装才能继续。
 
-📦 安装方式（请选择适合您系统的方式）：
+是否授权我为您自动安装 ALIYUN CLI？（是/否）
+```
 
-  • macOS:
-    brew install aliyun-cli
+用户回答「是」后，检测操作系统并自动执行安装：
 
-  • Linux:
-    curl -fsSL https://aliyun-client-download.oss-cn-hangzhou.aliyuncs.com/install.sh | bash
+- macOS → `brew install aliyun-cli`
+- Linux → `curl -fsSL https://aliyun-client-download.oss-cn-hangzhou.aliyuncs.com/install.sh | bash`
 
-  • 手动安装:
-    https://github.com/aliyun/aliyun-cli/releases
+安装完成后严格回复：
+
+```
+✅ ALIYUN CLI 安装完成！
+
+正在重新检查环境配置……
+```
+
+随后自动重新执行 `{baseDir}/scripts/check_aliyun_cli.sh`，根据新状态继续流转。
+
+用户回答「否」时严格回复：
+
+```
+好的，您也可以手动安装：
+  https://github.com/aliyun/aliyun-cli/releases
 
 安装完成后请告诉我，我将继续为您配置。
 ```
@@ -138,16 +151,7 @@ Phase D ─ 配置定时任务与通知（子 Agent: cron-scheduler）
 bash {baseDir}/scripts/run_inspection.sh create
 ```
 
-2. 从返回 JSON 中提取 `Data.TaskId`，返回示例：
-
-```json
-{
-  "Success": true,
-  "Message": "任务创建成功",
-  "Data": { "TaskId": "9adf8567-b619-4d37-8ff2-01d38a76****" },
-  "RequestId": "FE9C65D7-930F-57A5-A207-8C396329****"
-}
-```
+2. 从返回 JSON 中提取 `Data.TaskId`
 
 3. 等待 **20 秒**
 
@@ -157,7 +161,7 @@ bash {baseDir}/scripts/run_inspection.sh create
 bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 ```
 
-5. 返回结果包含 `MarkdownText`（整体报告摘要）和 `Data[]`（各实例详情），根据结果选择回复模板
+5. 从返回中解析 `MarkdownText`（整体报告摘要）和 `Data[]`（各实例详情及 `LevelSummary`），根据结果选择回复模板。API 返回结构详见 [references/api_reference.md](references/api_reference.md)
 
 ### 回复模板
 
