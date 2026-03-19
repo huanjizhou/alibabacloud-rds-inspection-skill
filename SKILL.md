@@ -12,6 +12,8 @@ metadata: { "openclaw": { "emoji": "🔍", "requires": { "bins": ["aliyun"] }, "
 
 本技能采用「主 Agent + 子 Agent」协作协议，帮助用户在 OpenClaw 中配置 RDS AI 助手的定期巡检与通知。
 
+API 产品码：`RdsAi`，API 版本：`2025-05-07`。
+
 ## 协议约定
 
 - **主 Agent**：负责流程编排、用户交互、状态流转判断
@@ -91,7 +93,7 @@ Phase D ─ 配置定时任务与通知（子 Agent: cron-scheduler）
   • AccessKey Secret
   • 默认 Region（如 cn-hangzhou）
 
-⚠️ 请确保该 AccessKey 具有 RDS 和 DAS 相关 API 的调用权限。
+⚠️ 请确保该 AccessKey 具有 RDS AI 服务（RdsAi）相关 API 的调用权限。
 
 配置完成后请告诉我，我将继续下一步。
 ```
@@ -130,27 +132,36 @@ Phase D ─ 配置定时任务与通知（子 Agent: cron-scheduler）
 
 ### 步骤
 
-1. 调用 CreateInspectionTask：
+1. 调用 CreateInspectionTask（创建一次性巡检任务）：
 
 ```bash
 bash {baseDir}/scripts/run_inspection.sh create
 ```
 
-2. 从返回 JSON 中提取 `Data.TaskId`
+2. 从返回 JSON 中提取 `Data.TaskId`，返回示例：
+
+```json
+{
+  "Success": true,
+  "Message": "任务创建成功",
+  "Data": { "TaskId": "9adf8567-b619-4d37-8ff2-01d38a76****" },
+  "RequestId": "FE9C65D7-930F-57A5-A207-8C396329****"
+}
+```
 
 3. 等待 **20 秒**
 
-4. 调用 GetInspectionReport：
+4. 调用 GetInspectionReport（获取巡检报告）：
 
 ```bash
 bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 ```
 
-5. 根据结果选择回复模板
+5. 返回结果包含 `MarkdownText`（整体报告摘要）和 `Data[]`（各实例详情），根据结果选择回复模板
 
 ### 回复模板
 
-**C1 — 巡检成功**（GetInspectionReport 返回 `Success: true`）
+**C1 — 巡检成功**（返回中包含 `MarkdownText` 和 `Data`）
 
 严格回复：
 
@@ -161,15 +172,17 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
    TaskId: {TaskId}
 ✅ 巡检报告已生成
 
-📊 报告摘要：
-{将报告中的关键指标和建议以简洁列表呈现}
+📊 报告摘要（共 {Data.length} 个实例）：
+{遍历 Data 数组，每个实例输出如下}
+  • {InstanceId}（{EngineType}, {Region}）
+    正常: {LevelSummary.Normal} | 警告: {LevelSummary.Warning} | 错误: {LevelSummary.Error} | 失败: {LevelSummary.Failed}
 
 巡检测试通过！是否继续配置定时巡检任务？（是/否）
 ```
 
 用户回答「是」→ 进入 Phase D，回答「否」→ 结束。
 
-**C2 — 未开通专业版**（返回错误码 `InvalidUserOrder`）
+**C2 — 未开通专业版**（HTTP 403，错误码 `InvalidUserOrder`）
 
 严格回复：
 
@@ -203,7 +216,7 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
    RequestId：{RequestId}
 
 请检查以下可能原因：
-  • AccessKey 权限是否包含 DAS 相关 API
+  • AccessKey 权限是否包含 rdsai 相关 API（rdsai:CreateInspectionTask、rdsai:GetInspectionReport）
   • 是否存在可用的 RDS 实例
   • 网络连接是否正常
 
@@ -319,11 +332,12 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 
 当 cron 触发时，按以下流程执行：
 
-1. `bash {baseDir}/scripts/run_inspection.sh create` → 提取 TaskId
+1. `bash {baseDir}/scripts/run_inspection.sh create` → 提取 `Data.TaskId`
 2. 等待 20 秒
 3. `bash {baseDir}/scripts/run_inspection.sh report {TaskId}` → 获取报告
-4. 有通知渠道 → 发送报告摘要；无通知渠道 → 仅记录日志
-5. 失败时通过通知渠道发送告警
+4. 解析 `MarkdownText` 和 `Data[].LevelSummary`
+5. 有通知渠道 → 发送报告摘要；无通知渠道 → 仅记录日志
+6. 失败时通过通知渠道发送告警
 
 ### 通知消息模板
 
@@ -335,7 +349,9 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 ⏰ 执行时间：{timestamp}
 ✅ 状态：成功
 
-{报告关键指标摘要}
+{遍历 Data 数组输出各实例摘要}
+  • {InstanceId}（{EngineType}, {Region}）
+    正常: {Normal} | 警告: {Warning} | 错误: {Error}
 
 详细报告请查看阿里云控制台。
 ```
@@ -347,7 +363,8 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 
 ⏰ 执行时间：{timestamp}
 ❌ 状态：失败
-📛 错误：{error_message}
+📛 错误码：{Code}
+📛 错误信息：{Message}
 
 请及时检查处理。
 ```
