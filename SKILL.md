@@ -1,10 +1,8 @@
 ---
 name: alibabacloud-rds-inspection
 description: >-
-  Configure Alibaba Cloud RDS AI Assistant periodic database inspection and notification in OpenClaw.
-  Use when user mentions: RDS巡检, 数据库巡检, RDS inspection, 定期巡检, 巡检报告, RDS health check,
-  数据库健康检查, 配置巡检, inspection cron, RDS AI助手巡检. Covers ALIYUN CLI setup, one-time
-  inspection test, cron scheduling, and notification channel binding for RDS instances.
+  阿里云 RDS 数据库定期巡检与通知：环境配置、巡检执行、历史对比、定时任务。
+  触发词：RDS巡检, 数据库巡检, 定期巡检, 巡检报告, /inspection.
 metadata: { "openclaw": { "emoji": "🔍", "requires": { "bins": ["aliyun"] }, "homepage": "https://github.com/alibabacloud/alibabacloud-rds-inspection-skill" } }
 ---
 
@@ -167,19 +165,46 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 
 **C1 — 巡检成功**（返回中包含 `MarkdownText` 和 `Data`）
 
+解析规则：
+1. 遍历所有 `Data[].Data[].Items[]`，按 `Level` 分桶（Error / Warning / Normal）
+2. 输出时按严重性排序：**Error 优先 → Warning 次之**
+3. 每条问题需包含：实例 ID、实例描述、巡检模块（Group）、具体问题描述（Message）
+4. 保存巡检记录（见「巡检记录存储与对比」章节）
+
 严格回复：
 
 ```
 🔍 巡检测试结果
 
-✅ 巡检任务创建成功
-   TaskId: {TaskId}
-✅ 巡检报告已生成
+✅ 巡检任务完成（TaskId: {TaskId}）
 
-📊 报告摘要（共 {Data.length} 个实例）：
-{遍历 Data 数组，每个实例输出如下}
-  • {InstanceId}（{EngineType}, {Region}）
-    正常: {LevelSummary.Normal} | 警告: {LevelSummary.Warning} | 错误: {LevelSummary.Error} | 失败: {LevelSummary.Failed}
+📋 总体概览
+  巡检实例数：{total_instances}
+  检查项总数：{total_checks}
+  ✅ 正常：{normal_count} | ⚠️ 警告：{warning_count} | ❌ 错误：{error_count}
+
+{如有 Error 项，输出以下区块}
+🔴 高危问题（{error_count} 项）：
+{按实例分组，每条 Error 级别 Item 输出一行}
+  ❌ {InstanceId} ({InstanceDesc}) — [{Group}] {Message}
+
+{如有 Warning 项，输出以下区块}
+⚠️ 警告项（{warning_count} 项）：
+{按实例分组，每条 Warning 级别 Item 输出一行}
+  ⚠️ {InstanceId} ({InstanceDesc}) — [{Group}] {Message}
+
+📊 异常实例摘要：
+{仅列出有 Warning 或 Error 的实例}
+  {InstanceId} ({InstanceDesc}, {EngineType}, {Region})
+    正常: {Normal} | 警告: {Warning} | 错误: {Error}
+
+📈 模块健康度：
+{汇总各 Group 的问题数，仅列出有异常的模块}
+  ❌ {Group}：{error}项错误, {warning}项警告
+  ⚠️ {Group}：{warning}项警告
+  ✅ 其余 {n} 个模块健康
+
+{如果有历史记录，输出对比区块，见「巡检记录存储与对比」章节}
 
 巡检测试通过！是否继续配置定时巡检任务？（是/否）
 ```
@@ -339,9 +364,11 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 1. `bash {baseDir}/scripts/run_inspection.sh create` → 提取 `Data.TaskId`
 2. 等待 20 秒
 3. `bash {baseDir}/scripts/run_inspection.sh report {TaskId}` → 获取报告
-4. 解析 `MarkdownText` 和 `Data[].LevelSummary`
-5. 有通知渠道 → 发送报告摘要；无通知渠道 → 仅记录日志
-6. 失败时通过通知渠道发送告警
+4. 解析所有 `Data[].Data[].Items[]`，按 Level 分桶（Error / Warning）
+5. 加载上次巡检记录，生成对比分析（见「巡检记录存储与对比」）
+6. 保存本次巡检记录
+7. 按照下方模板生成通知内容，发送到通知渠道
+8. 失败时发送告警通知
 
 ### 通知消息模板
 
@@ -353,9 +380,31 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 ⏰ 执行时间：{timestamp}
 ✅ 状态：成功
 
-{遍历 Data 数组输出各实例摘要}
-  • {InstanceId}（{EngineType}, {Region}）
-    正常: {Normal} | 警告: {Warning} | 错误: {Error}
+📋 总体概览
+  巡检实例数：{total_instances} | 高危实例：{error_instances} | 警告实例：{warning_instances}
+  检查项：✅ {normal} | ⚠️ {warnings} | ❌ {errors}
+
+{如有 Error 项}
+🔴 高危问题（{error_count} 项）：
+  ❌ {InstanceId} ({InstanceDesc}) — [{Group}] {Message}
+  ❌ {InstanceId} ({InstanceDesc}) — [{Group}] {Message}
+  ...
+
+{如有 Warning 项}
+⚠️ 警告项（{warning_count} 项）：
+  ⚠️ {InstanceId} ({InstanceDesc}) — [{Group}] {Message}
+  ...
+
+📊 与上次巡检对比：
+  🆕 新增问题：{new_count} 项
+  ✅ 已修复：{resolved_count} 项
+  🔄 持续存在：{persistent_count} 项
+  {如有新增问题，逐条列出}
+
+📈 模块健康度：
+  {仅列出有异常的模块}
+  ❌ {Group}：{errors}项错误, {warnings}项警告
+  ✅ 其余 {n} 个模块健康
 
 详细报告请查看阿里云控制台。
 ```
@@ -372,6 +421,55 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 
 请及时检查处理。
 ```
+
+---
+
+## 巡检记录存储与对比
+
+### 存储规则
+
+每次巡检完成后（Phase C 或 cron 触发），将结果保存到 `{baseDir}/records/inspections/`：
+
+```
+records/inspections/
+├── 2026-03-19_0200_{taskId}.json   # 最近一次
+├── 2026-03-18_0200_{taskId}.json   # 上一次
+└── ...
+```
+
+每个 JSON 文件结构：`task_id`、`timestamp`、`total_instances`、`summary`（normal/warning/error/failed 计数）、`issues` 数组。
+
+`issues` 只收录 Level 为 Error 或 Warning 的 Item，每项包含 `instance_id`、`instance_desc`、`engine_type`、`region`、`level`、`group`、`message`，按严重性排序（Error → Warning）。
+
+### 对比分析逻辑
+
+每次生成报告前，读取 `records/inspections/` 中最新的上一次记录，按以下规则对比：
+
+1. **匹配键**：`instance_id` + `group` + `message` 三者相同视为同一问题
+2. **分类**：
+   - 🆕 **新增问题**：本次有、上次无
+   - ✅ **已修复**：上次有、本次无
+   - 🔄 **持续存在**：两次都有
+3. **输出格式**（嵌入到 C1 模板和通知模板的对比区块中）：
+
+```
+📊 与上次巡检对比（上次：{last_timestamp}）：
+  🆕 新增问题：{new_count} 项
+  ✅ 已修复：{resolved_count} 项
+  🔄 持续存在：{persistent_count} 项
+
+{如有新增问题}
+  新增：
+    ❌ {InstanceId} ({InstanceDesc}) — [{Group}] {Message}
+    ...
+
+{如有已修复}
+  修复：
+    ✅ {InstanceId} ({InstanceDesc}) — [{Group}] {Message}（已恢复正常）
+    ...
+```
+
+如果没有历史记录（首次巡检），跳过对比区块，仅在末尾提示：`📝 首次巡检，无历史对比数据。`
 
 ---
 
