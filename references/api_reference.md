@@ -2,7 +2,7 @@
 
 产品码：`RdsAi`（不指定 `--version`，自动使用最新 API 版本）
 
-CLI 基础格式：`aliyun RdsAi <Action> [--<Param> <Value>]`
+CLI 基础格式：`aliyun RdsAi <Action> --region <Region> [--<Param> <Value>]`
 
 API 文档：https://help.aliyun.com/zh/rds/developer-reference/api-rdsai-2025-05-07-overview
 
@@ -13,7 +13,7 @@ API 文档：https://help.aliyun.com/zh/rds/developer-reference/api-rdsai-2025-0
 ### CreateInspectionTask — 创建批量实例巡检任务
 
 ```bash
-aliyun RdsAi CreateInspectionTask --InstanceIds "all"
+aliyun RdsAi CreateInspectionTask --InstanceIds "all" --region cn-hangzhou
 ```
 
 #### 请求参数
@@ -57,7 +57,7 @@ aliyun RdsAi CreateInspectionTask --InstanceIds "all"
 ### GetInspectionReport — 获取巡检报告
 
 ```bash
-aliyun RdsAi GetInspectionReport --TaskId "9adf8567-xxxx"
+aliyun RdsAi GetInspectionReport --TaskId "9adf8567-xxxx" --region cn-hangzhou
 ```
 
 #### 请求参数
@@ -119,7 +119,7 @@ aliyun RdsAi GetInspectionReport --TaskId "9adf8567-xxxx"
 ### GetStandAloneReports — 查询非定时任务的巡检报告列表
 
 ```bash
-aliyun RdsAi GetStandAloneReports
+aliyun RdsAi GetStandAloneReports --region cn-hangzhou
 ```
 
 #### 请求参数
@@ -142,7 +142,8 @@ aliyun RdsAi CreateScheduledTask \
   --Name "每日巡检" \
   --InstanceIds "rm-xxx,rm-yyy" \
   --Frequency "DAILY" \
-  --StartTime "02:00:00Z"
+  --StartTime "02:00:00Z" \
+  --region cn-hangzhou
 ```
 
 #### 请求参数

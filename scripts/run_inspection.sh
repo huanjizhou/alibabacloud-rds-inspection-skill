@@ -14,6 +14,18 @@ set -euo pipefail
 
 PRODUCT="RdsAi"
 
+# 从 aliyun configure 获取默认 region，也可通过环境变量 ALICLOUD_REGION 覆盖
+if [ -n "${ALICLOUD_REGION:-}" ]; then
+    REGION="$ALICLOUD_REGION"
+else
+    REGION=$(aliyun configure get 2>/dev/null | grep -i "region" | awk -F'=' '{print $2}' | tr -d ' ' || echo "")
+fi
+
+if [ -z "$REGION" ]; then
+    echo '{"Success":false,"Message":"未检测到 Region，请先运行 aliyun configure 或设置环境变量 ALICLOUD_REGION"}'
+    exit 1
+fi
+
 ACTION="${1:-}"
 
 case "$ACTION" in
@@ -21,6 +33,7 @@ case "$ACTION" in
         INSTANCE_IDS="${2:-all}"
         OUTPUT=$(aliyun "$PRODUCT" CreateInspectionTask \
             --InstanceIds "$INSTANCE_IDS" \
+            --region "$REGION" \
             2>&1) || true
         echo "$OUTPUT"
         if echo "$OUTPUT" | grep -q '"Success":true'; then
@@ -45,10 +58,12 @@ case "$ACTION" in
                 OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
                     --TaskId "$TASK_ID" \
                     --InstanceId "$INSTANCE_ID" \
+                    --region "$REGION" \
                     2>&1) || true
             else
                 OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
                     --TaskId "$TASK_ID" \
+                    --region "$REGION" \
                     2>&1) || true
             fi
             
