@@ -26,6 +26,11 @@ if [ -z "$REGION" ]; then
     exit 1
 fi
 
+# 去除 ANSI 颜色码，保证 grep 正常匹配
+strip_ansi() {
+    sed 's/\x1b\[[0-9;]*m//g'
+}
+
 ACTION="${1:-}"
 
 case "$ACTION" in
@@ -34,9 +39,9 @@ case "$ACTION" in
         OUTPUT=$(aliyun "$PRODUCT" create-inspection-task \
             --instance-ids "$INSTANCE_IDS" \
             --region "$REGION" \
-            2>&1) || true
+            2>/dev/null) || true
         echo "$OUTPUT"
-        if echo "$OUTPUT" | grep -q '"Success":true'; then
+        if echo "$OUTPUT" | strip_ansi | grep -q '"Success"'; then
             exit 0
         else
             exit 1
@@ -59,30 +64,32 @@ case "$ACTION" in
                     --task-id "$TASK_ID" \
                     --instance-id "$INSTANCE_ID" \
                     --region "$REGION" \
-                    2>&1) || true
+                    2>/dev/null) || true
             else
                 OUTPUT=$(aliyun "$PRODUCT" get-inspection-report \
                     --task-id "$TASK_ID" \
                     --region "$REGION" \
-                    2>&1) || true
+                    2>/dev/null) || true
             fi
+            
+            CLEAN_OUTPUT=$(echo "$OUTPUT" | strip_ansi)
             
             # 终态错误：立即返回，不再重试
-            if echo "$OUTPUT" | grep -q '"InvalidUserOrder"'; then
+            if echo "$CLEAN_OUTPUT" | grep -q 'InvalidUserOrder'; then
                 echo "$OUTPUT"
                 exit 1
             fi
-            if echo "$OUTPUT" | grep -q '"TaskNotFound"'; then
+            if echo "$CLEAN_OUTPUT" | grep -q 'TaskNotFound'; then
                 echo "$OUTPUT"
                 exit 1
             fi
-            if echo "$OUTPUT" | grep -q '"PermissionDenied"'; then
+            if echo "$CLEAN_OUTPUT" | grep -q 'PermissionDenied'; then
                 echo "$OUTPUT"
                 exit 1
             fi
             
-            # 成功：返回了有效报告
-            if echo "$OUTPUT" | grep -q '"Data"'; then
+            # 成功：返回了有效报告（包含 Data 字段）
+            if echo "$CLEAN_OUTPUT" | grep -q '"Data"'; then
                 echo "$OUTPUT"
                 exit 0
             fi
