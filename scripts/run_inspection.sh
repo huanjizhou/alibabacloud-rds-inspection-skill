@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # RDS AI 巡检任务执行脚本
-# 产品码：RdsAi（自动使用最新 API 版本）
+# 产品码：rdsai（自动使用最新 API 版本）
 #
 # 用法：
 #   bash run_inspection.sh create                         创建一次性巡检任务（全部实例）
@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-PRODUCT="RdsAi"
+PRODUCT="rdsai"
 
 # 从 aliyun configure 获取默认 region，也可通过环境变量 ALICLOUD_REGION 覆盖
 if [ -n "${ALICLOUD_REGION:-}" ]; then
@@ -31,8 +31,8 @@ ACTION="${1:-}"
 case "$ACTION" in
     create)
         INSTANCE_IDS="${2:-all}"
-        OUTPUT=$(aliyun "$PRODUCT" CreateInspectionTask \
-            --InstanceIds "$INSTANCE_IDS" \
+        OUTPUT=$(aliyun "$PRODUCT" create-inspection-task \
+            --instance-ids "$INSTANCE_IDS" \
             --region "$REGION" \
             2>&1) || true
         echo "$OUTPUT"
@@ -55,14 +55,14 @@ case "$ACTION" in
         MAX_RETRIES=12
         for ((i=1; i<=MAX_RETRIES; i++)); do
             if [ -n "$INSTANCE_ID" ]; then
-                OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
-                    --TaskId "$TASK_ID" \
-                    --InstanceId "$INSTANCE_ID" \
+                OUTPUT=$(aliyun "$PRODUCT" get-inspection-report \
+                    --task-id "$TASK_ID" \
+                    --instance-id "$INSTANCE_ID" \
                     --region "$REGION" \
                     2>&1) || true
             else
-                OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
-                    --TaskId "$TASK_ID" \
+                OUTPUT=$(aliyun "$PRODUCT" get-inspection-report \
+                    --task-id "$TASK_ID" \
                     --region "$REGION" \
                     2>&1) || true
             fi
