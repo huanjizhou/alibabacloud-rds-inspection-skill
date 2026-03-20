@@ -52,7 +52,7 @@ case "$ACTION" in
         
         INSTANCE_ID="${3:-}"
         
-        MAX_RETRIES=12
+        MAX_RETRIES=15
         for ((i=1; i<=MAX_RETRIES; i++)); do
             if [ -n "$INSTANCE_ID" ]; then
                 OUTPUT=$(aliyun "$PRODUCT" get-inspection-report \
@@ -89,7 +89,7 @@ case "$ACTION" in
             
             # 瞬态错误（InternalError / Throttling / 报告未就绪）：静默重试
             >&2 echo "⏳ 巡检报告生成中，请稍候……（第 ${i}/${MAX_RETRIES} 次查询）"
-            sleep 10
+            sleep 20
         done
         
         echo '{"Success":false,"Message":"巡检报告生成超时，请稍后重试"}'
