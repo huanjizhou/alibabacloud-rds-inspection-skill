@@ -60,7 +60,7 @@ case "$ACTION" in
         
         INSTANCE_ID="${3:-}"
         
-        MAX_RETRIES=15
+        MAX_RETRIES=3
         for ((i=1; i<=MAX_RETRIES; i++)); do
             if [ -n "$INSTANCE_ID" ]; then
                 OUTPUT=$(run_aliyun "$PRODUCT" get-inspection-report \
@@ -96,7 +96,7 @@ case "$ACTION" in
             # 调试：输出当前拿到的内容长度，帮助排查
             OUTPUT_LEN=${#OUTPUT}
             >&2 echo "⏳ 巡检报告生成中，请稍候……（第 ${i}/${MAX_RETRIES} 次查询，响应长度: ${OUTPUT_LEN}）"
-            sleep 20
+            sleep 10
         done
         
         # 超时：输出最后一次拿到的内容，方便排查
