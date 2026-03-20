@@ -54,7 +54,19 @@ else
     exit 1
 fi
 
-VERSION="3.3.2"
+FALLBACK_VERSION="3.3.2"
+echo "正在获取最新版本号..."
+VERSION=$(curl -sS --connect-timeout 5 --max-time 10 \
+    "https://api.github.com/repos/aliyun/aliyun-cli/releases/latest" \
+    2>/dev/null | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/' || true)
+
+if [ -z "$VERSION" ]; then
+    echo -e "${YELLOW}⚠${NC} 无法获取最新版本，使用兜底版本 ${FALLBACK_VERSION}"
+    VERSION="$FALLBACK_VERSION"
+else
+    echo "检测到最新版本: ${VERSION}"
+fi
+
 FILENAME="aliyun-cli-${OS_TYPE}-${VERSION}-${ARCH_TYPE}.tgz"
 
 # 多源下载：阿里云 CDN 优先（国内快），GitHub 兜底

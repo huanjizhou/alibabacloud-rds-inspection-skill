@@ -1,8 +1,8 @@
 # RDS AI 巡检 API 参考
 
-产品码：`RdsAi` | API 版本：`2025-05-07`
+产品码：`RdsAi`（不指定 `--version`，自动使用最新 API 版本）
 
-CLI 基础格式：`aliyun RdsAi <Action> --version 2025-05-07 [--<Param> <Value>]`
+CLI 基础格式：`aliyun RdsAi <Action> [--<Param> <Value>]`
 
 API 文档：https://help.aliyun.com/zh/rds/developer-reference/api-rdsai-2025-05-07-overview
 
@@ -13,7 +13,7 @@ API 文档：https://help.aliyun.com/zh/rds/developer-reference/api-rdsai-2025-0
 ### CreateInspectionTask — 创建批量实例巡检任务
 
 ```bash
-aliyun RdsAi CreateInspectionTask --InstanceIds "all" --version 2025-05-07
+aliyun RdsAi CreateInspectionTask --InstanceIds "all"
 ```
 
 #### 请求参数
@@ -57,7 +57,7 @@ aliyun RdsAi CreateInspectionTask --InstanceIds "all" --version 2025-05-07
 ### GetInspectionReport — 获取巡检报告
 
 ```bash
-aliyun RdsAi GetInspectionReport --TaskId "9adf8567-xxxx" --version 2025-05-07
+aliyun RdsAi GetInspectionReport --TaskId "9adf8567-xxxx"
 ```
 
 #### 请求参数
@@ -119,7 +119,7 @@ aliyun RdsAi GetInspectionReport --TaskId "9adf8567-xxxx" --version 2025-05-07
 ### GetStandAloneReports — 查询非定时任务的巡检报告列表
 
 ```bash
-aliyun RdsAi GetStandAloneReports --version 2025-05-07
+aliyun RdsAi GetStandAloneReports
 ```
 
 #### 请求参数
@@ -142,8 +142,7 @@ aliyun RdsAi CreateScheduledTask \
   --Name "每日巡检" \
   --InstanceIds "rm-xxx,rm-yyy" \
   --Frequency "DAILY" \
-  --StartTime "02:00:00Z" \
-  --version 2025-05-07
+  --StartTime "02:00:00Z"
 ```
 
 #### 请求参数

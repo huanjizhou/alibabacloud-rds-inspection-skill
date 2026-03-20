@@ -10,7 +10,7 @@ metadata: { "openclaw": { "emoji": "🔍", "requires": { "bins": ["aliyun"] }, "
 
 本技能采用「主 Agent + 子 Agent」协作协议，帮助用户在 OpenClaw 中配置 RDS AI 助手的定期巡检与通知。
 
-API 产品码：`RdsAi`，API 版本：`2025-05-07`。
+API 产品码：`RdsAi`（不指定 `--version`，自动使用最新 API 版本）。
 
 ## 协议约定
 
@@ -21,11 +21,11 @@ API 产品码：`RdsAi`，API 版本：`2025-05-07`。
 
 ### 严格禁止（⚠️ 必须遵守）
 
-1. **仅允许调用以下两个 API**（产品码 `RdsAi`，版本 `2025-05-07`）：
+1. **仅允许调用以下两个 API**（产品码 `RdsAi`，不指定 `--version`）：
    - `CreateInspectionTask` — 创建巡检任务
    - `GetInspectionReport` — 获取巡检报告
 2. **绝对禁止**使用任何其他 RDS API 或产品（如 `rds DescribeDBInstances`、`das` 系列）代替或"降级"巡检
-3. **绝对禁止**自行更换 API 版本号或产品码；如遇版本报错，向用户反馈而非自行尝试
+3. **绝对禁止**自行添加 `--version` 参数或更换产品码；如遇报错，向用户反馈而非自行尝试
 4. **绝对禁止**在巡检等待期间向用户暴露内部错误（如 `InternalError`、`Throttling`）；轮询过程中遇到瞬态错误应静默重试，仅告知用户「⏳ 巡检报告生成中，请稍候……」
 5. **绝对禁止**自行发明替代巡检方案（如"用标准 API 做基础巡检"、"手动查询慢日志"等）；本技能只做 RDS AI 专业版巡检，无替代方案
 

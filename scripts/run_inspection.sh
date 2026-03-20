@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # RDS AI 巡检任务执行脚本
-# 产品码：RdsAi | API 版本：2025-05-07
+# 产品码：RdsAi（自动使用最新 API 版本）
 #
 # 用法：
 #   bash run_inspection.sh create                         创建一次性巡检任务（全部实例）
@@ -12,7 +12,6 @@
 
 set -euo pipefail
 
-API_VERSION="2025-05-07"
 PRODUCT="RdsAi"
 
 ACTION="${1:-}"
@@ -22,7 +21,7 @@ case "$ACTION" in
         INSTANCE_IDS="${2:-all}"
         OUTPUT=$(aliyun "$PRODUCT" CreateInspectionTask \
             --InstanceIds "$INSTANCE_IDS" \
-            --version "$API_VERSION" 2>&1) || true
+            2>&1) || true
         echo "$OUTPUT"
         if echo "$OUTPUT" | grep -q '"Success":true'; then
             exit 0
@@ -46,11 +45,11 @@ case "$ACTION" in
                 OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
                     --TaskId "$TASK_ID" \
                     --InstanceId "$INSTANCE_ID" \
-                    --version "$API_VERSION" 2>&1) || true
+                    2>&1) || true
             else
                 OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
                     --TaskId "$TASK_ID" \
-                    --version "$API_VERSION" 2>&1) || true
+                    2>&1) || true
             fi
             
             # 终态错误：立即返回，不再重试
