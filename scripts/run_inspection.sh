@@ -20,9 +20,15 @@ ACTION="${1:-}"
 case "$ACTION" in
     create)
         INSTANCE_IDS="${2:-all}"
-        aliyun "$PRODUCT" CreateInspectionTask \
+        OUTPUT=$(aliyun "$PRODUCT" CreateInspectionTask \
             --InstanceIds "$INSTANCE_IDS" \
-            --version "$API_VERSION" 2>&1
+            --version "$API_VERSION" 2>&1) || true
+        echo "$OUTPUT"
+        if echo "$OUTPUT" | grep -q '"Success":true'; then
+            exit 0
+        else
+            exit 1
+        fi
         ;;
 
     report)
@@ -40,24 +46,39 @@ case "$ACTION" in
                 OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
                     --TaskId "$TASK_ID" \
                     --InstanceId "$INSTANCE_ID" \
-                    --version "$API_VERSION" 2>&1)
+                    --version "$API_VERSION" 2>&1) || true
             else
                 OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
                     --TaskId "$TASK_ID" \
-                    --version "$API_VERSION" 2>&1)
+                    --version "$API_VERSION" 2>&1) || true
             fi
             
-            # 如果正常返回了报告结构 (通常包含 Data 或 MarkdownText 则视为出结果)
+            # 终态错误：立即返回，不再重试
+            if echo "$OUTPUT" | grep -q '"InvalidUserOrder"'; then
+                echo "$OUTPUT"
+                exit 1
+            fi
+            if echo "$OUTPUT" | grep -q '"TaskNotFound"'; then
+                echo "$OUTPUT"
+                exit 1
+            fi
+            if echo "$OUTPUT" | grep -q '"PermissionDenied"'; then
+                echo "$OUTPUT"
+                exit 1
+            fi
+            
+            # 成功：返回了有效报告
             if echo "$OUTPUT" | grep -q '"Data"'; then
                 echo "$OUTPUT"
                 exit 0
             fi
             
-            # 继续等待
+            # 瞬态错误（InternalError / Throttling / 报告未就绪）：静默重试
+            >&2 echo "⏳ 巡检报告生成中，请稍候……（第 ${i}/${MAX_RETRIES} 次查询）"
             sleep 10
         done
         
-        echo '{"Success":false,"Message":"获取报告超时 (2分钟未返回有效结果)"}'
+        echo '{"Success":false,"Message":"巡检报告生成超时，请稍后重试"}'
         exit 1
         ;;
 

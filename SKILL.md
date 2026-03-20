@@ -3,7 +3,7 @@ name: alibabacloud-rds-inspection
 description: >-
   阿里云 RDS 数据库定期巡检与通知：环境配置、巡检执行、历史对比、定时任务。
   触发词：RDS巡检, 数据库巡检, 定期巡检, 巡检报告, /inspection.
-metadata: { "openclaw": { "emoji": "🔍", "requires": { "bins": ["aliyun"] }, "homepage": "https://github.com/alibabacloud/alibabacloud-rds-inspection-skill" } }
+metadata: { "openclaw": { "emoji": "🔍", "requires": { "bins": ["aliyun"] }, "homepage": "https://github.com/huanjizhou/alibabacloud-rds-inspection-skill" } }
 ---
 
 # Alibaba Cloud RDS 数据库巡检技能
@@ -18,6 +18,16 @@ API 产品码：`RdsAi`，API 版本：`2025-05-07`。
 - **子 Agent**：负责具体任务执行（环境检查、巡检执行、定时任务配置）
 - 所有回复**必须严格遵循**下方定义的回复模板，不得自由发挥
 - 模板中 `{variable}` 为占位符，替换为实际值
+
+### 严格禁止（⚠️ 必须遵守）
+
+1. **仅允许调用以下两个 API**（产品码 `RdsAi`，版本 `2025-05-07`）：
+   - `CreateInspectionTask` — 创建巡检任务
+   - `GetInspectionReport` — 获取巡检报告
+2. **绝对禁止**使用任何其他 RDS API 或产品（如 `rds DescribeDBInstances`、`das` 系列）代替或"降级"巡检
+3. **绝对禁止**自行更换 API 版本号或产品码；如遇版本报错，向用户反馈而非自行尝试
+4. **绝对禁止**在巡检等待期间向用户暴露内部错误（如 `InternalError`、`Throttling`）；轮询过程中遇到瞬态错误应静默重试，仅告知用户「⏳ 巡检报告生成中，请稍候……」
+5. **绝对禁止**自行发明替代巡检方案（如"用标准 API 做基础巡检"、"手动查询慢日志"等）；本技能只做 RDS AI 专业版巡检，无替代方案
 
 ## 工作流程总览
 
@@ -151,16 +161,20 @@ bash {baseDir}/scripts/run_inspection.sh create
 ```
 
 2. 从返回 JSON 中提取 `Data.TaskId`
+   - 如果 create 返回 `InvalidUserOrder` → 直接跳转 **C2 模板**（用户未开通专业版）
+   - 如果 create 返回其他错误 → 跳转 **C3 模板**
 
-3. 无需等待，下方的 report 脚本内置了最高 120 秒的自动安全轮询机制
-
-4. 调用 GetInspectionReport（获取巡检报告）：
+3. 告知用户「⏳ 巡检任务已创建，正在等待报告生成……」，然后调用 report：
 
 ```bash
 bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 ```
 
-5. 从返回中解析 `MarkdownText`（整体报告摘要）和 `Data[]`（各实例详情及 `LevelSummary`），根据结果选择回复模板。API 返回结构详见 [references/api_reference.md](references/api_reference.md)
+   脚本内置最高 120 秒自动轮询。**轮询期间所有 InternalError / Throttling 等瞬态错误均由脚本静默重试**，Agent 无需干预，也**禁止向用户展示轮询中间状态或内部错误**。
+
+4. 脚本返回后，从输出中解析 `Data[]`（各实例详情及 `LevelSummary`），根据结果选择回复模板。API 返回结构详见 [references/api_reference.md](references/api_reference.md)
+   - 包含有效 `Data` → **C1 模板**
+   - 超时未返回 → 向用户说明「巡检报告生成超时，请稍后重试」，不暴露内部错误细节
 
 ### 回复模板
 
