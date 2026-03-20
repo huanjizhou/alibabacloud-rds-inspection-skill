@@ -31,17 +31,34 @@ case "$ACTION" in
             echo '{"Success":false,"Message":"缺少参数: TaskId"}'
             exit 1
         fi
+        
         INSTANCE_ID="${3:-}"
-        if [ -n "$INSTANCE_ID" ]; then
-            aliyun "$PRODUCT" GetInspectionReport \
-                --TaskId "$TASK_ID" \
-                --InstanceId "$INSTANCE_ID" \
-                --version "$API_VERSION" 2>&1
-        else
-            aliyun "$PRODUCT" GetInspectionReport \
-                --TaskId "$TASK_ID" \
-                --version "$API_VERSION" 2>&1
-        fi
+        
+        MAX_RETRIES=12
+        for ((i=1; i<=MAX_RETRIES; i++)); do
+            if [ -n "$INSTANCE_ID" ]; then
+                OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
+                    --TaskId "$TASK_ID" \
+                    --InstanceId "$INSTANCE_ID" \
+                    --version "$API_VERSION" 2>&1)
+            else
+                OUTPUT=$(aliyun "$PRODUCT" GetInspectionReport \
+                    --TaskId "$TASK_ID" \
+                    --version "$API_VERSION" 2>&1)
+            fi
+            
+            # 如果正常返回了报告结构 (通常包含 Data 或 MarkdownText 则视为出结果)
+            if echo "$OUTPUT" | grep -q '"Data"'; then
+                echo "$OUTPUT"
+                exit 0
+            fi
+            
+            # 继续等待
+            sleep 10
+        done
+        
+        echo '{"Success":false,"Message":"获取报告超时 (2分钟未返回有效结果)"}'
+        exit 1
         ;;
 
     *)

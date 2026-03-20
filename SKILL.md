@@ -61,10 +61,11 @@ Phase D ─ 配置定时任务与通知（子 Agent: cron-scheduler）
 是否授权我为您自动安装 ALIYUN CLI？（是/否）
 ```
 
-用户回答「是」后，检测操作系统并自动执行安装：
+用户回答「是」后，执行更稳健的安装脚本自动下载：
 
-- macOS → `brew install aliyun-cli`
-- Linux → `curl -fsSL https://aliyun-client-download.oss-cn-hangzhou.aliyuncs.com/install.sh | bash`
+```bash
+bash {baseDir}/scripts/install_aliyun_cli.sh
+```
 
 安装完成后严格回复：
 
@@ -151,7 +152,7 @@ bash {baseDir}/scripts/run_inspection.sh create
 
 2. 从返回 JSON 中提取 `Data.TaskId`
 
-3. 等待 **20 秒**
+3. 无需等待，下方的 report 脚本内置了最高 120 秒的自动安全轮询机制
 
 4. 调用 GetInspectionReport（获取巡检报告）：
 
@@ -362,10 +363,10 @@ bash {baseDir}/scripts/run_inspection.sh report {TaskId}
 当 cron 触发时，按以下流程执行：
 
 1. `bash {baseDir}/scripts/run_inspection.sh create` → 提取 `Data.TaskId`
-2. 等待 20 秒
+2. 无需等待，下方的 report 工具内置轮询
 3. `bash {baseDir}/scripts/run_inspection.sh report {TaskId}` → 获取报告
 4. 解析所有 `Data[].Data[].Items[]`，按 Level 分桶（Error / Warning）
-5. 加载上次巡检记录，生成对比分析（见「巡检记录存储与对比」）
+5. 调用 `python3 {baseDir}/scripts/compare_inspection.py {last_record} {current_record}` 生成对比分析，直接提取输出区块
 6. 保存本次巡检记录
 7. 按照下方模板生成通知内容，发送到通知渠道
 8. 失败时发送告警通知
@@ -443,14 +444,12 @@ records/inspections/
 
 ### 对比分析逻辑
 
-每次生成报告前，读取 `records/inspections/` 中最新的上一次记录，按以下规则对比：
-
-1. **匹配键**：`instance_id` + `group` + `message` 三者相同视为同一问题
-2. **分类**：
-   - 🆕 **新增问题**：本次有、上次无
-   - ✅ **已修复**：上次有、本次无
-   - 🔄 **持续存在**：两次都有
-3. **输出格式**（嵌入到 C1 模板和通知模板的对比区块中）：
+每次生成报告前，不要自己去读取比对庞大的 JSON！！
+直接调用内置的对比脚本：
+```bash
+python3 {baseDir}/scripts/compare_inspection.py {records/inspections/last_record.json} {records/inspections/current_record.json}
+```
+脚本会立刻输出标准格式的对比结果摘要。将脚本的标准输出（STDOUT）完整嵌入到下方模板的 `📊 与上次巡检对比：` 区块中。
 
 ```
 📊 与上次巡检对比（上次：{last_timestamp}）：
