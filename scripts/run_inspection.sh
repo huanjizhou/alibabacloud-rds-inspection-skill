@@ -26,22 +26,25 @@ if [ -z "$REGION" ]; then
     exit 1
 fi
 
-# 去除 ANSI 颜色码，保证 grep 正常匹配
-strip_ansi() {
-    sed 's/\x1b\[[0-9;]*m//g'
-}
-
 ACTION="${1:-}"
+TMPFILE=$(mktemp)
+trap "rm -f $TMPFILE" EXIT
+
+# 执行 aliyun 命令，写入临时文件，去除 ANSI 颜色码后读取
+run_aliyun() {
+    aliyun "$@" > "$TMPFILE" 2>&1 || true
+    # 去除所有 ANSI 转义序列
+    sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' "$TMPFILE"
+}
 
 case "$ACTION" in
     create)
         INSTANCE_IDS="${2:-all}"
-        OUTPUT=$(aliyun "$PRODUCT" create-inspection-task \
+        OUTPUT=$(run_aliyun "$PRODUCT" create-inspection-task \
             --instance-ids "$INSTANCE_IDS" \
-            --region "$REGION" \
-            2>/dev/null) || true
+            --region "$REGION")
         echo "$OUTPUT"
-        if echo "$OUTPUT" | strip_ansi | grep -q '"Success"'; then
+        if echo "$OUTPUT" | grep -q '"Success"'; then
             exit 0
         else
             exit 1
@@ -60,45 +63,47 @@ case "$ACTION" in
         MAX_RETRIES=15
         for ((i=1; i<=MAX_RETRIES; i++)); do
             if [ -n "$INSTANCE_ID" ]; then
-                OUTPUT=$(aliyun "$PRODUCT" get-inspection-report \
+                OUTPUT=$(run_aliyun "$PRODUCT" get-inspection-report \
                     --task-id "$TASK_ID" \
                     --instance-id "$INSTANCE_ID" \
-                    --region "$REGION" \
-                    2>/dev/null) || true
+                    --region "$REGION")
             else
-                OUTPUT=$(aliyun "$PRODUCT" get-inspection-report \
+                OUTPUT=$(run_aliyun "$PRODUCT" get-inspection-report \
                     --task-id "$TASK_ID" \
-                    --region "$REGION" \
-                    2>/dev/null) || true
+                    --region "$REGION")
             fi
-            
-            CLEAN_OUTPUT=$(echo "$OUTPUT" | strip_ansi)
             
             # 终态错误：立即返回，不再重试
-            if echo "$CLEAN_OUTPUT" | grep -q 'InvalidUserOrder'; then
+            if echo "$OUTPUT" | grep -q 'InvalidUserOrder'; then
                 echo "$OUTPUT"
                 exit 1
             fi
-            if echo "$CLEAN_OUTPUT" | grep -q 'TaskNotFound'; then
+            if echo "$OUTPUT" | grep -q 'TaskNotFound'; then
                 echo "$OUTPUT"
                 exit 1
             fi
-            if echo "$CLEAN_OUTPUT" | grep -q 'PermissionDenied'; then
+            if echo "$OUTPUT" | grep -q 'PermissionDenied'; then
                 echo "$OUTPUT"
                 exit 1
             fi
             
-            # 成功：返回了有效报告（包含 Data 字段）
-            if echo "$CLEAN_OUTPUT" | grep -q '"Data"'; then
+            # 成功：返回了有效报告（包含 Data 字段且有 TaskId）
+            if echo "$OUTPUT" | grep -q '"Data"'; then
                 echo "$OUTPUT"
                 exit 0
             fi
             
-            # 瞬态错误（InternalError / Throttling / 报告未就绪）：静默重试
-            >&2 echo "⏳ 巡检报告生成中，请稍候……（第 ${i}/${MAX_RETRIES} 次查询）"
+            # 调试：输出当前拿到的内容长度，帮助排查
+            OUTPUT_LEN=${#OUTPUT}
+            >&2 echo "⏳ 巡检报告生成中，请稍候……（第 ${i}/${MAX_RETRIES} 次查询，响应长度: ${OUTPUT_LEN}）"
             sleep 20
         done
         
+        # 超时：输出最后一次拿到的内容，方便排查
+        if [ -n "$OUTPUT" ]; then
+            >&2 echo "⚠️ 最后一次响应内容："
+            >&2 echo "$OUTPUT"
+        fi
         echo '{"Success":false,"Message":"巡检报告生成超时，请稍后重试"}'
         exit 1
         ;;
